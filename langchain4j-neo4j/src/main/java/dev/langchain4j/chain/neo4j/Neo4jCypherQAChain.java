@@ -13,7 +13,7 @@ import java.util.Map;
 
 import static dev.langchain4j.internal.ValidationUtils.ensureNotNull;
 
-public class Neo4jCypherChain implements Chain<String, String> {
+public class Neo4jCypherQAChain implements Chain<String, String> {
 
     private static final PromptTemplate CYPHER_PROMPT_TEMPLATE = PromptTemplate.from("""
             Based on the Neo4j graph schema below, write a Cypher query that would answer the user's question:
@@ -34,7 +34,7 @@ public class Neo4jCypherChain implements Chain<String, String> {
     private final ChatLanguageModel chatLanguageModel;
 
     @Builder
-    public Neo4jCypherChain(Neo4jGraph graph, ChatLanguageModel chatLanguageModel) {
+    public Neo4jCypherQAChain(Neo4jGraph graph, ChatLanguageModel chatLanguageModel) {
 
         this.graph = ensureNotNull(graph, "graph");
         this.chatLanguageModel = ensureNotNull(chatLanguageModel, "chatLanguageModel");
