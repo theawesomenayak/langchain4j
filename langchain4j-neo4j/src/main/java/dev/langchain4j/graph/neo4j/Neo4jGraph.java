@@ -2,12 +2,9 @@ package dev.langchain4j.graph.neo4j;
 
 import lombok.Builder;
 import lombok.Getter;
-import org.neo4j.driver.Driver;
-import org.neo4j.driver.Query;
 import org.neo4j.driver.Record;
-import org.neo4j.driver.Result;
-import org.neo4j.driver.Session;
-import org.neo4j.driver.Value;
+import org.neo4j.driver.*;
+import org.neo4j.driver.summary.ResultSummary;
 
 import java.util.List;
 import java.util.Map;
@@ -54,10 +51,10 @@ public class Neo4jGraph implements AutoCloseable {
         refreshSchema();
     }
 
-    public void executeWrite(String queryString) {
+    public ResultSummary executeWrite(String queryString) {
 
         try (Session session = this.driver.session()) {
-            session.executeWrite(tx -> tx.run(queryString).consume());
+            return session.executeWrite(tx -> tx.run(queryString).consume());
         }
     }
 
