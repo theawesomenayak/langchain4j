@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.*;
+import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.summary.ResultSummary;
 
 import java.util.List;
@@ -48,7 +49,14 @@ public class Neo4jGraph implements AutoCloseable {
 
         this.driver = ensureNotNull(driver, "driver");
         this.driver.verifyConnectivity();
-        refreshSchema();
+        try {
+            refreshSchema();
+        } catch (ClientException e) {
+            if ("Neo.ClientError.Procedure.ProcedureNotFound".equals(e.code())) {
+                throw new RuntimeException("Please ensure the APOC plugin is installed in Neo4j", e);
+            }
+            throw e;
+        }
     }
 
     public ResultSummary executeWrite(String queryString) {
