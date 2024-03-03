@@ -2,64 +2,122 @@ package dev.langchain4j.chain.neo4j;
 
 import dev.langchain4j.graph.neo4j.Neo4jGraph;
 import dev.langchain4j.model.chat.ChatLanguageModel;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.neo4j.driver.AuthTokens;
-import org.neo4j.driver.Driver;
-import org.neo4j.driver.GraphDatabase;
-import org.testcontainers.containers.Neo4jContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
-@Testcontainers
 @ExtendWith(MockitoExtension.class)
 class Neo4JCypherQAChainTest {
 
-    @Container
-    private static Neo4jContainer<?> neo4jContainer = new Neo4jContainer<>(DockerImageName.parse("neo4j:5.16.0"))
-            .withoutAuthentication()
-            .withLabsPlugins("apoc");
-
+    @Mock
     private static Neo4jGraph neo4jGraph;
 
     @Mock
     private ChatLanguageModel chatLanguageModel;
 
-    @BeforeAll
-    static void startContainer() {
+    @Mock
+    private ChatLanguageModel cypherLanguageModel;
 
-        neo4jContainer.start();
-        Driver driver = GraphDatabase.driver(neo4jContainer.getBoltUrl(), AuthTokens.none());
-        neo4jGraph = Neo4jGraph.builder().driver(driver).build();
-        neo4jGraph.executeWrite("CREATE (n:Person {name: 'John'})");
-        neo4jGraph.refreshSchema();
-    }
+    @Mock
+    private ChatLanguageModel responseLanguageModel;
 
-    @AfterAll
-    static void stopContainer() {
+    @Test
+    void executeShouldThrowExceptionWhenBothChatAndCypherLanguageModelsAreNull() {
 
-        neo4jGraph.close();
-        neo4jContainer.stop();
+        // when
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            Neo4jCypherQAChain.builder().graph(neo4jGraph).responseLanguageModel(responseLanguageModel).build();
+        });
+
+        // then
+        assertEquals("Either chatLanguageModel or cypherLanguageModel must be provided", exception.getMessage());
     }
 
     @Test
-    void executeShouldReturnExpectedResponse() {
+    void executeShouldThrowExceptionWhenBothChatAndResponseLanguageModelsAreNull() {
+
+        // when
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            Neo4jCypherQAChain.builder().graph(neo4jGraph).cypherLanguageModel(cypherLanguageModel).build();
+        });
+
+        // then
+        assertEquals("Either chatLanguageModel or responseLanguageModel must be provided", exception.getMessage());
+    }
+
+    @Test
+    void executeShouldThrowExceptionWhenAllLanguageModelsAreProvided() {
+
+        // when
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            Neo4jCypherQAChain.builder().graph(neo4jGraph).chatLanguageModel(chatLanguageModel).cypherLanguageModel(cypherLanguageModel).responseLanguageModel(responseLanguageModel).build();
+        });
+
+        // then
+        assertEquals("You can specify either chatLanguageModel and cypherLanguageModel, or only chatLanguageModel, but not all three", exception.getMessage());
+    }
+
+    @Test
+    void executeShouldThrowExceptionWhenBothChatAndCypherLanguageModelsAreProvided() {
+
+        // when
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            Neo4jCypherQAChain.builder().graph(neo4jGraph).chatLanguageModel(chatLanguageModel).cypherLanguageModel(cypherLanguageModel).build();
+        });
+
+        // then
+        assertEquals("Either chatLanguageModel or cypherLanguageModel must be provided, but not both", exception.getMessage());
+    }
+
+    @Test
+    void executeShouldThrowExceptionWhenBothChatAndResponseLanguageModelsAreProvided() {
+
+        // when
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            Neo4jCypherQAChain.builder().graph(neo4jGraph).chatLanguageModel(chatLanguageModel).responseLanguageModel(responseLanguageModel).build();
+        });
+
+        // then
+        assertEquals("Either chatLanguageModel or responseLanguageModel must be provided, but not both", exception.getMessage());
+    }
+
+    @Test
+    void executeShouldReturnExpectedResponseWhenOnlyChatLanguageModelIsUsed() {
 
         // given
+        doReturn("schema").when(neo4jGraph).getSchema();
+
         when(chatLanguageModel.generate(anyString()))
                 .thenReturn("MATCH (n:Person) RETURN n.name AS name")
                 .thenReturn("The name of the person is John.");
 
         Neo4jCypherQAChain chain = Neo4jCypherQAChain.builder().graph(neo4jGraph).chatLanguageModel(chatLanguageModel).build();
+
+        String question = "What is the name of the person?";
+
+        // when
+        String actualResponse = chain.execute(question);
+
+        // then
+        assertEquals("The name of the person is John.", actualResponse);
+    }
+
+    @Test
+    void executeShouldReturnExpectedResponseWhenCypherAndResponseLanguageModelsAreUsed() {
+
+        // given
+        doReturn("schema").when(neo4jGraph).getSchema();
+        doReturn("MATCH (n:Person) RETURN n.name AS name").when(cypherLanguageModel).generate(anyString());
+        doReturn("The name of the person is John.").when(responseLanguageModel).generate(anyString());
+
+        Neo4jCypherQAChain chain = Neo4jCypherQAChain.builder().graph(neo4jGraph).cypherLanguageModel(cypherLanguageModel).responseLanguageModel(responseLanguageModel).build();
 
         String question = "What is the name of the person?";
 
